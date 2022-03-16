@@ -1,22 +1,23 @@
 import AXSwift
 import Cocoa
 import PromiseKit
+import CoreGraphics
 
 // MARK: - Window
 
 /// A window.
 public final class Window {
     internal let delegate: WindowDelegate
-
+    
     // A Window holds a strong reference to the Application and therefore the ApplicationDelegate.
     // It should not be held internally by delegates, or it would create a reference cycle.
     fileprivate var application_: Application!
-
+    
     internal init(delegate: WindowDelegate, application: Application) {
         self.delegate = delegate
         application_ = application
     }
-
+    
     /// This initializer fails only if the ApplicationDelegate is no longer reachable (because the
     /// application terminated, which means this window no longer exists), or the StateDelegate has
     /// been destroyed.
@@ -24,50 +25,50 @@ public final class Window {
         guard let appDelegate = delegate.appDelegate else {
             // The application terminated.
             log.debug("Window for delegate \(delegate) failed to initialize because of unreachable "
-                    + "ApplicationDelegate")
+                      + "ApplicationDelegate")
             return nil
         }
         guard let app = Application(delegate: appDelegate) else {
             log.debug("Window for delegate \(delegate) failed to initialize because Application "
-                    + "failed to initialize")
+                      + "failed to initialize")
             return nil
         }
         self.init(delegate: delegate, application: app)
     }
-
+    
     /// The application the window belongs to.
     public var application: Application { return application_ }
-
+    
     /// The screen that (most of) the window is on. `nil` if the window is completely off-screen.
     public var screen: Screen? {
         let screenIntersectSizes =
-            application.swindlerState.screens.lazy
+        application.swindlerState.screens.lazy
             .map { screen in (screen, screen.frame.intersection(self.frame.value)) }
             .filter { _, intersect in !intersect.isNull }
             .map { screen, intersect in (screen, intersect.size.width * intersect.size.height) }
         let bestScreen = screenIntersectSizes.max { lhs, rhs in lhs.1 < rhs.1 }?.0
         return bestScreen
     }
-
+    
     /// Whether or not the window referred to by this type remains valid. Windows usually become
     /// invalid because they are destroyed (in which case a WindowDestroyedEvent will be emitted).
     /// They can also become invalid because they do not have all the required properties, or
     /// because the application that owns them is otherwise not giving a well-behaved response.
     public var isValid: Bool { return delegate.isValid }
-
+    
     /// The frame of the window.
     ///
     /// The origin of the frame is the bottom-left corner of the window in screen coordinates.
     public var frame: WriteableProperty<OfType<CGRect>> { return delegate.frame }
     /// The size of the window in screen coordinates.
     public var size: WriteableProperty<OfType<CGSize>> { return delegate.size }
-
+    
     /// The window title.
     public var title: Property<OfDefaultedType<String>> { return delegate.title }
-
+    
     /// Whether the window is minimized.
     public var isMinimized: WriteableProperty<OfType<Bool>> { return delegate.isMinimized }
-
+    
     /// Whether the window is fullscreen or not.
     public var isFullscreen: WriteableProperty<OfType<Bool>> { return delegate.isFullscreen }
 }
@@ -105,17 +106,17 @@ extension String: Defaultable {
 
 protocol WindowDelegate: AnyObject {
     var isValid: Bool { get }
-
+    
     // Optional because a WindowDelegate shouldn't hold a strong reference to its parent
     // ApplicationDelegate.
     var appDelegate: ApplicationDelegate? { get }
-
+    
     var frame: WriteableProperty<OfType<CGRect>>! { get }
     var size: SizeProperty! { get }
     var title: Property<OfDefaultedType<String>>! { get }
     var isMinimized: WriteableProperty<OfType<Bool>>! { get }
     var isFullscreen: WriteableProperty<OfType<Bool>>! { get }
-
+    
     func equalTo(_ other: WindowDelegate) -> Bool
 }
 
@@ -125,26 +126,26 @@ protocol WindowDelegate: AnyObject {
 final class OSXWindowDelegate<
     UIElement, ApplicationElement: ApplicationElementType, Observer: ObserverType
 >: WindowDelegate
-    where Observer.UIElement == UIElement, ApplicationElement.UIElement == UIElement {
+where Observer.UIElement == UIElement, ApplicationElement.UIElement == UIElement {
     typealias Object = Window
-
+    
     fileprivate weak var notifier: EventNotifier?
     fileprivate var initialized: Promise<Void>!
-
+    
     let axElement: UIElement
-
+    
     fileprivate(set) var isValid: Bool = true
-
+    
     fileprivate var watchedAxProperties: [AXSwift.AXNotification: [PropertyType]]!
-
+    
     weak var appDelegate: ApplicationDelegate?
-
+    
     var frame: WriteableProperty<OfType<CGRect>>!
     var size: SizeProperty!
     var title: Property<OfDefaultedType<String>>!
     var isMinimized: WriteableProperty<OfType<Bool>>!
     var isFullscreen: WriteableProperty<OfType<Bool>>!
-
+    
     private init(_ appDelegate: ApplicationDelegate,
                  _ notifier: EventNotifier?,
                  _ axElement: UIElement,
@@ -153,10 +154,10 @@ final class OSXWindowDelegate<
         self.appDelegate = appDelegate
         self.notifier = notifier
         self.axElement = axElement
-
+        
         // Create a promise for the attribute dictionary we'll get from getMultipleAttributes.
         let (initPromise, seal) = Promise<[AXSwift.Attribute: Any]>.pending()
-
+        
         // Initialize all properties.
         let frameDelegate = FramePropertyDelegate(axElement, initPromise, systemScreens)
         frame = WriteableProperty(
@@ -181,7 +182,7 @@ final class OSXWindowDelegate<
         isFullscreen = WriteableProperty(
             AXPropertyDelegate(axElement, .fullScreen, initPromise),
             notifier: self)
-
+        
         let axProperties: [PropertyType] = [
             size,
             title,
@@ -191,7 +192,7 @@ final class OSXWindowDelegate<
         let allProperties: [PropertyType] = axProperties + [
             frame
         ]
-
+        
         // Map notifications on this element to the corresponding property.
         // Note that `size` implicitly updates every time `frame` updates, so it is not listed here.
         watchedAxProperties = [
@@ -201,7 +202,7 @@ final class OSXWindowDelegate<
             .windowMiniaturized: [isMinimized],
             .windowDeminiaturized: [isMinimized]
         ]
-
+        
         // Start watching for notifications.
         let notifications = watchedAxProperties.keys + [
             .uiElementDestroyed
@@ -209,7 +210,7 @@ final class OSXWindowDelegate<
         let watched = watchWindowElement(axElement,
                                          observer: observer,
                                          notifications: notifications)
-
+        
         // Fetch attribute values.
         let attributes = axProperties.map {($0.delegate as! AXPropertyDelegateType).attribute} + [
             .frame,
@@ -218,7 +219,7 @@ final class OSXWindowDelegate<
         fetchAttributes(
             attributes, forElement: axElement, after: watched, seal: seal
         )
-
+        
         // Ignore windows with the "AXUnknown" role. This (undocumented) role shows up in several
         // places, including Chrome tooltips and OS X fullscreen transitions.
         let subroleChecked = initPromise.done { attributeValues in
@@ -232,10 +233,10 @@ final class OSXWindowDelegate<
                 throw OSXDriverError.windowIgnored(element: axElement)
             }
         }
-
+        
         initialized = when(fulfilled: initializeProperties(allProperties).asVoid(), subroleChecked)
     }
-
+    
     private func watchWindowElement(_ element: UIElement,
                                     observer: Observer,
                                     notifications: [AXNotification]) -> Promise<Void> {
@@ -247,7 +248,7 @@ final class OSXWindowDelegate<
             }
         }
     }
-
+    
     private func unwatchWindowElement(_ element: UIElement,
                                       observer: Observer,
                                       notifications: [AXNotification]) -> Promise<Void> {
@@ -259,7 +260,7 @@ final class OSXWindowDelegate<
             }
         }
     }
-
+    
     func equalTo(_ rhs: WindowDelegate) -> Bool {
         if let other = rhs as? OSXWindowDelegate {
             return axElement == other.axElement
@@ -285,7 +286,7 @@ extension OSXWindowDelegate {
             return window.initialized.map { window }
         }
     }
-
+    
     func handleEvent(_ event: AXSwift.AXNotification, observer: Observer) {
         switch event {
         case .uiElementDestroyed:
@@ -315,7 +316,7 @@ extension OSXWindowDelegate: PropertyNotifier {
             Event(external: external, object: window, oldValue: oldValue, newValue: newValue)
         )
     }
-
+    
     func notifyInvalid() {
         isValid = false
     }
@@ -329,41 +330,46 @@ extension OSXWindowDelegate: PropertyNotifier {
 /// the top-left, and Cocoa coordinates, which have it at the bottom-left.
 private final class FramePropertyDelegate<UIElement: UIElementType>: PropertyDelegate {
     typealias T = CGRect
-
+    
     let frame: AXPropertyDelegate<CGRect, UIElement>
     let pos: AXPropertyDelegate<CGPoint, UIElement>
     let size: AXPropertyDelegate<CGSize, UIElement>
-
+    
     let systemScreens: SystemScreenDelegate
-
+    
     typealias InitDict = [AXSwift.Attribute: Any]
-
+    
     init(_ element: UIElement, _ initPromise: Promise<InitDict>, _ screens: SystemScreenDelegate) {
         frame = AXPropertyDelegate<CGRect, UIElement>(element, .frame, initPromise)
         pos = AXPropertyDelegate<CGPoint, UIElement>(element, .position, initPromise)
         size = AXPropertyDelegate<CGSize, UIElement>(element, .size, initPromise)
         systemScreens = screens
     }
-
+    
     func readValue() throws -> T? {
         guard let rect = try frame.readValue() else { return nil }
         return invert(rect)
     }
-
+    
     func writeValue(_ newValue: T) throws {
         let rect = invert(newValue)
         try pos.writeValue(rect.origin)
         try size.writeValue(rect.size)
     }
-
+    
     func initialize() -> Promise<T?> {
         return frame.initialize().map { rect in
             rect.map{ self.invert($0) }
         }
     }
-
+    
     private func invert(_ rect: CGRect) -> CGRect {
-        let inverted = CGPoint(x: rect.minX, y: systemScreens.maxY - rect.maxY)
+        let inverted: CGPoint
+        if let mainScreen = systemScreens.main {
+            inverted = CGPoint(x: rect.minX, y: mainScreen.frame.height - rect.maxY)
+        }else {
+            inverted = CGPoint(x: rect.minX, y: systemScreens.maxY - rect.maxY)
+        }
         return CGRect(origin: inverted, size: rect.size)
     }
 }
@@ -378,29 +384,29 @@ private final class FramePropertyDelegate<UIElement: UIElementType>: PropertyDel
 /// The purpose of this property is to support atomic writes to the `size` attribute of a window.
 final class SizeProperty: WriteableProperty<OfType<CGSize>> {
     let frame: WriteableProperty<OfType<CGRect>>
-
+    
     init<Impl: PropertyDelegate, Notifier: PropertyNotifier>(
         _ delegate: Impl, notifier: Notifier, frame: WriteableProperty<OfType<CGRect>>
     ) where Impl.T == NonOptionalType {
         self.frame = frame
         super.init(delegate, notifier: notifier)
     }
-
+    
     override func initialize<Impl: PropertyDelegate>(_ delegate: Impl) -> Promise<Void> {
         return frame.initialized
     }
-
+    
     override func getValue() -> PropertyType {
         return frame.value.size
     }
-
+    
     @discardableResult
     public override func refresh() -> Promise<PropertyType> {
         return frame.refresh().map { rect in
             return rect.size
         }
     }
-
+    
     public override func set(_ newValue: NonOptionalType) -> Promise<PropertyType> {
         // Because we don't have a WindowSizeChangedEvent, we don't have to worry about our own
         // events. However, the frame does need to know that we are mutating it from within
