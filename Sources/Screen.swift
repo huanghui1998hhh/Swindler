@@ -31,6 +31,7 @@ protocol SystemScreenDelegate: AnyObject {
     var lock_: NSLock { get }
     var screens_: [ScreenDelegate] { get }
 
+    var focused: ScreenDelegate? { get }
     var main: ScreenDelegate? { get }
 
     var maxY: CGFloat { get }
@@ -92,6 +93,7 @@ class FakeSystemScreenDelegate: SystemScreenDelegate {
         nil
     }
 
+    var focused: ScreenDelegate?
     var main: ScreenDelegate?
 
     init(screens: [ScreenDelegate]) {
@@ -157,7 +159,8 @@ class OSXSystemScreenDelegate: SystemScreenDelegate {
     var delegates: [Delegate]
     weak var notifier: EventNotifier?
 
-    var main: ScreenDelegate? { NSScreen.main.flatMap(delegateForNative) }
+    var focused: ScreenDelegate? { NSScreen.main.flatMap(delegateForNative) }
+    var main: ScreenDelegate? { screens.first }
 
     init(_ notifier: EventNotifier) {
         self.notifier = notifier

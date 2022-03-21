@@ -256,12 +256,12 @@ class FakeSpec: QuickSpec {
                     afterEvents.append(event)
                 }
 
-                let spaceA = fakeState.mainScreen!.spaceId
+                let spaceA = fakeState.focusedScreen!.spaceId
                 let spaceB = fakeState.newSpaceId
                 expect(spaceA) != spaceB
 
-                fakeState.mainScreen!.spaceId = spaceB
-                expect(fakeState.mainScreen!.screen.spaceId).toEventually(equal(spaceB))
+                fakeState.focusedScreen!.spaceId = spaceB
+                expect(fakeState.focusedScreen!.screen.spaceId).toEventually(equal(spaceB))
                 expect(afterEvents).toEventually(haveCount(1))
                 expect(beforeEvents).to(haveCount(1))
                 expect(beforeEvents[0].ids) == [spaceB]
@@ -269,8 +269,8 @@ class FakeSpec: QuickSpec {
 
                 beforeEvents = []
                 afterEvents = []
-                fakeState.mainScreen!.spaceId = spaceA
-                expect(fakeState.mainScreen!.screen.spaceId).toEventually(equal(spaceA))
+                fakeState.focusedScreen!.spaceId = spaceA
+                expect(fakeState.focusedScreen!.screen.spaceId).toEventually(equal(spaceA))
                 expect(afterEvents).toEventually(haveCount(1))
                 expect(beforeEvents).to(haveCount(1))
                 expect(beforeEvents[0].ids) == [spaceA]

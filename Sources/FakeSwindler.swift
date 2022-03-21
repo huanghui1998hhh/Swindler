@@ -55,7 +55,7 @@ public class FakeState {
         spaceTracker.nextSpaceId
     }
 
-    public var mainScreen: FakeScreen? {
+    public var focusedScreen: FakeScreen? {
         get {
             guard let delegate = ssd.main else { return nil }
             return FakeScreen(delegate as! FakeScreenDelegate, self)

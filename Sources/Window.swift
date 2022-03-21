@@ -365,7 +365,7 @@ private final class FramePropertyDelegate<UIElement: UIElementType>: PropertyDel
     
     private func invert(_ rect: CGRect) -> CGRect {
         let inverted: CGPoint
-        if let mainScreen = systemScreens.screens.first {
+        if let mainScreen = systemScreens.main {
             inverted = CGPoint(x: rect.minX, y: mainScreen.frame.maxY - rect.maxY)
         }else {
             inverted = CGPoint(x: rect.minX, y: systemScreens.maxY - rect.maxY)
