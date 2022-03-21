@@ -53,12 +53,12 @@ public final class State {
 
     /// Currently focused screen, if any.
     public var focusedScreen: Screen? {
-        return delegate.systemScreens.main.map {Screen(delegate: $0)}
+        return delegate.systemScreens.focused.map {Screen(delegate: $0)}
     }
     
     /// Main screen, if any. Not equal to `NSScreen.main`. It depends on `System Preferences -> Displays -> Main Display`.
     public var mainScreen: Screen? {
-        return delegate.systemScreens.screens.first
+        return delegate.systemScreens.main.map {Screen(delegate: $0)}
     }
 
     /// Calls `handler` when the specified `Event` occurs.
